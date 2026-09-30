@@ -2827,8 +2827,8 @@ if(live){
     getAuth(app);
 
 
-  storage =
-    getStorage(app);
+ storage =
+  getStorage(app);
 
 
   ref =
