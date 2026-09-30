@@ -1,7 +1,33 @@
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,doc,onSnapshot,setDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {firebaseConfig as C} from "./firebase-config.js";
+
+import {
+  getFirestore,
+  doc,
+  onSnapshot,
+  setDoc,
+  addDoc,
+  collection,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+import {
+  firebaseConfig as C,
+  ADMIN_EMAIL
+} from "./firebase-config.js";
 const live=!/^YOUR/.test(C.apiKey);let db,auth,ref;
 const A="assets/lokhit-";
 // ---- default content (every string here is editable and saved to Firestore doc site/content) ----
