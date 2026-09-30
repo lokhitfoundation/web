@@ -31,7 +31,7 @@ import {
 const live=!/^YOUR/.test(C.apiKey);let db,auth,ref;
 const A="assets/lokhit-";
 // ---- default content (every string here is editable and saved to Firestore doc site/content) ----
-const D={nav_about:"About",nav_team:"Team",nav_projects:"Projects",nav_kits:"Delegate kits",nav_contact:"Contact",editor:"Editor access",brand1:"Lokhit",brand2:"Foundation",
+const D={nav_about:"About",nav_team:"Team",nav_projects:"Projects",nav_kits:"Delegate kits",nav_contact:"Contact",editor:"Sign In",brand1:"Lokhit",brand2:"Foundation",
 heroLabel:"Jaipur · Rajasthan",heroTitle:"Planting trees is the work. Keeping them alive is the promise.",heroBody:"Lokhit works with schools, neighbourhoods and local stewards to bring shade back to Jaipur — one considered site at a time.",cta_how:"How we work",cta_work:"See the work",heroCap:"A foundation for\nthe places we share",coord:"26°54′N",heroImg:"",
 prem_lbl:"The premise",missionTitle:"The city is a living thing.",missionBody:"We plant where a tree can become part of daily life: beside a classroom, along a dusty edge, in the shared space between homes. The work is measured in care, not ceremony.",
 way_lbl:"A way of working",approachTitle:"Start with the ground.",approachBody:"We listen to the people who use a place, choose what can survive there, then return to water, mulch and tend every sapling until it can stand on its own.",cta_more:"More about our approach",img1:A+"a6-chitpad.png",img2:A+"a5-notepad.png",
