@@ -1,7 +1,7 @@
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getFirestore,doc,onSnapshot,setDoc,collection,addDoc,deleteDoc,query,orderBy,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {firebaseConfig as C} from "./firebase-config.js";
+import {firebaseConfig as C} from "./firebase-config.js"; 
 const live=!/^YOUR/.test(C.apiKey);let db,auth,ref,unsubM,MSG=[],IM={};
 const isAdmin=u=>!!u&&!!C.adminEmail&&u.email?.toLowerCase()==C.adminEmail.toLowerCase();
 const busy=()=>{const a=document.activeElement;return a&&(a.isContentEditable||/^(INPUT|TEXTAREA)$/.test(a.tagName))};
