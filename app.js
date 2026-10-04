@@ -1,17 +1,14 @@
-import {firebaseConfig as C} from "./firebase-config.js";
-let initializeApp,getFirestore,doc,onSnapshot,setDoc,getDoc,getDocFromCache,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,deleteDoc,query,orderBy,serverTimestamp;
-let getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut;
-let live=false,firebaseReady=false,db,auth,ref,unsubM,MSG=[],IM={},IMP={},READY=false,LAST="";
-const CACHE_KEY="lokhit-site-content-v1";
-const ready=()=>{if(READY)return;READY=true;document.body.classList.add("ok")};
-const cacheContent=()=>{try{localStorage.setItem(CACHE_KEY,JSON.stringify(S))}catch(e){}};
-const loadCached=()=>{try{const raw=localStorage.getItem(CACHE_KEY);if(!raw)return false;const d=JSON.parse(raw);if(!d||typeof d!=="object")return false;merge(d);LAST=JSON.stringify(S);return true}catch(e){return false}};
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,doc,onSnapshot,setDoc,collection,addDoc,deleteDoc,query,orderBy,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {firebaseConfig as C} from "./firebase-config.js"; 
+const live=!/^YOUR/.test(C.apiKey);let db,auth,ref,unsubM,MSG=[],IM={};
 const isAdmin=u=>!!u&&!!C.adminEmail&&u.email?.toLowerCase()==C.adminEmail.toLowerCase();
 const busy=()=>{const a=document.activeElement;return a&&(a.isContentEditable||/^(INPUT|TEXTAREA)$/.test(a.tagName))};
 const A="assets/lokhit-";
 // ---- default content (every string here is editable and saved to Firestore doc site/content) ----
 const D={nav_about:"About",nav_projects:"Projects",nav_kits:"Delegate kits",nav_contact:"Contact",signin:"Sign in",brand1:"Lokhit",brand2:"Foundation",
-heroLabel:"Jaipur · Rajasthan",heroTitle:"Planting trees is the work. Keeping them alive is the promise.",heroBody:"Lokhit works with schools, neighbourhoods and local stewards to bring shade back to Jaipur — one considered site at a time.",cta_how:"How we work",cta_work:"See the work",heroCap:"A foundation for\nthe places we share",coord:"26°54′N",heroImg:A+"leather-folder.png",
+heroLabel:"Jaipur · Rajasthan",heroTitle:"Planting trees is the work. Keeping them alive is the promise.",heroBody:"Lokhit works with schools, neighbourhoods and local stewards to bring shade back to Jaipur — one considered site at a time.",cta_how:"How we work",cta_work:"See the work",heroCap:"A foundation for\nthe places we share",coord:"26°54′N",heroImg:"",
 prem_lbl:"The premise",missionTitle:"The city is a living thing.",missionBody:"We plant where a tree can become part of daily life: beside a classroom, along a dusty edge, in the shared space between homes. The work is measured in care, not ceremony.",
 way_lbl:"A way of working",approachTitle:"Start with the ground.",approachBody:"We listen to the people who use a place, choose what can survive there, then return to water, mulch and tend every sapling until it can stand on its own.",cta_more:"More about our approach",img1:A+"a6-chitpad.png",img2:A+"a5-notepad.png",
 work_lbl:"Selected work",work_side:"What is planted\nis tended",view_project:"View project",cta_all:"All projects",take_lbl:"Take part",take_h:"Bring a little more shade into the picture.",take_p:"A project can start with a school, a street, a team or a conversation. If you have a place in mind, we would like to hear about it.",cta_start:"Start a conversation",
@@ -34,6 +31,9 @@ const mp=p=>p?esc(p.startsWith("fb:")?(IM[p.slice(3)]||""):p):"";
 const lab=(n,k)=>`<div class="lab"><b>${n}</b>${e(k)}</div>`;
 const al=(h,k)=>`<a class="al" href="#/${h}">${e(k)} <span>↗</span></a>`;
 const mono=c=>`<div class="ph ${c}"><img src="${A}logo.png" alt=""></div>`;
+const timg=(k,c,alt,fb)=>{const v=S.t[k]??D[k];return v?`<div class="${c}" data-im="t:${k}"><img class="gs" src="${mp(v)}" alt="${alt}"></div>`:`<div class="${c}" data-im="t:${k}">${fb||mono("")}</div>`};
+const limg=(l,i,fl,c,alt)=>{const v=S[l][i][fl];return `<div class="${c}" data-im="l:${l}:${i}:${fl}">${v?`<img class="gs" src="${mp(v)}" alt="${esc(alt)}">`:mono("")}</div>`};
+const ctl=(l,i)=>`<div class="ctl"><button data-a="up" data-l="${l}" data-i="${i}">↑</button><button data-a="dn" data-l="${l}" data-i="${i}">↓</button>${l=="projects"?`<button data-a="ft" data-l="${l}" data-i="${i}">★ ${S[l][i].featured?"featured":"feature"}</button>`:""}${l=="kits"?`<button data-a="img" data-p="l:kits:${i}:imagePaths:0">🖼 closed image</button><button data-a="img" data-p="l:kits:${i}:imagePaths:1">🖼 open image</button>`:""}<button data-a="del" data-l="${l}" data-i="${i}">✕ delete</button></div>`;
 const fix=v=>v.replace(/^(assets\/lokhit-(?!logo)[\w-]+)\.png$/,"$1.jpg");
 const itag=(v,alt)=>{if(!v)return"";if(v.startsWith("fb:")){const id=v.slice(3),d=IM[id];return `<img class="gs lz${d?" ld":""}" data-fb="${id}" ${d?`src="${d}"`:""} alt="${esc(alt)}" decoding="async">`}return `<img class="gs lz" src="${esc(fix(v))}" alt="${esc(alt)}" decoding="async" onload="this.classList.add('ld')" onerror="this.classList.add('ld')">`};
 function fbLoad(id){return IM[id]?Promise.resolve(IM[id]):IMP[id]||(IMP[id]=(async()=>{const r=doc(db,"images",id);let s;try{s=await getDocFromCache(r)}catch(x){s=await getDoc(r)}return IM[id]=s.data()?.data||""})())}
