@@ -1,9 +1,11 @@
-import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,doc,onSnapshot,setDoc,getDoc,getDocFromCache,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,deleteDoc,query,orderBy,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {firebaseConfig as C} from "./firebase-config.js";
-const live=!/^YOUR/.test(C.apiKey);let db,auth,ref,unsubM,MSG=[],IM={},IMP={},READY=false,LAST="";
+let initializeApp,getFirestore,doc,onSnapshot,setDoc,getDoc,getDocFromCache,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,deleteDoc,query,orderBy,serverTimestamp;
+let getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut;
+let live=false,firebaseReady=false,db,auth,ref,unsubM,MSG=[],IM={},IMP={},READY=false,LAST="";
+const CACHE_KEY="lokhit-site-content-v1";
 const ready=()=>{if(READY)return;READY=true;document.body.classList.add("ok")};
+const cacheContent=()=>{try{localStorage.setItem(CACHE_KEY,JSON.stringify(S))}catch(e){}};
+const loadCached=()=>{try{const raw=localStorage.getItem(CACHE_KEY);if(!raw)return false;const d=JSON.parse(raw);if(!d||typeof d!=="object")return false;merge(d);LAST=JSON.stringify(S);return true}catch(e){return false}};
 const isAdmin=u=>!!u&&!!C.adminEmail&&u.email?.toLowerCase()==C.adminEmail.toLowerCase();
 const busy=()=>{const a=document.activeElement;return a&&(a.isContentEditable||/^(INPUT|TEXTAREA)$/.test(a.tagName))};
 const A="assets/lokhit-";
@@ -34,6 +36,152 @@ const al=(h,k)=>`<a class="al" href="#/${h}">${e(k)} <span>↗</span></a>`;
 const mono=c=>`<div class="ph ${c}"><img src="${A}logo.png" alt=""></div>`;
 const fix=v=>v.replace(/^(assets\/lokhit-(?!logo)[\w-]+)\.png$/,"$1.jpg");
 const itag=(v,alt)=>{if(!v)return"";if(v.startsWith("fb:")){const id=v.slice(3),d=IM[id];return `<img class="gs lz${d?" ld":""}" data-fb="${id}" ${d?`src="${d}"`:""} alt="${esc(alt)}" decoding="async">`}return `<img class="gs lz" src="${esc(fix(v))}" alt="${esc(alt)}" decoding="async" onload="this.classList.add('ld')" onerror="this.classList.add('ld')">`};
+function fbLoad(id){return IM[id]?Promise.resolve(IM[id]):IMP[id]||(IMP[id]=(async()=>{const r=doc(db,"images",id);let s;try{s=await getDocFromCache(r)}catch(x){s=await getDoc(r)}return IM[id]=s.data()?.data||""})())}
+function hydrate(){if(!live)return;document.querySelectorAll("img[data-fb]").forEach(img=>fbLoad(img.dataset.fb).then(d=>{if(d&&!img.src){img.onload=()=>img.classList.add("ld");img.src=d}}).catch(()=>{}))}
+const timg=(k,c,alt,fb)=>`<div class="${c}" data-im="t:${k}">${itag(S.t[k]??D[k],alt)||fb||mono("")}</div>`;
+const limg=(l,i,fl,c,alt)=>`<div class="${c}" data-im="l:${l}:${i}:${fl}">${itag(S[l][i][fl],alt)||mono("")}</div>`;
+const ctl=(l,i)=>`<div class="ctl"><button data-a="up" data-l="${l}" data-i="${i}">↑</button><button data-a="dn" data-l="${l}" data-i="${i}">↓</button>${l=="projects"?`<button data-a="ft" data-l="${l}" data-i="${i}">★ ${S[l][i].featured?"featured":"feature"}</button>`:""}${l=="kits"?`<button data-a="img" data-p="l:kits:${i}:imagePaths:0">🖼 closed image</button><button data-a="img" data-p="l:kits:${i}:imagePaths:1">🖼 open image</button>`:""}<button data-a="del" data-l="${l}" data-i="${i}">✕ delete</button></div>`;
+const addb=l=>`<button class="addb" data-a="add" data-l="${l}">+ Add ${l.slice(0,-1)=="team"?"person":l.slice(0,-1)}</button>`;
+const hero=(a,b,n)=>`<h1 class="hh">${e(a)}<br><span class="dim">${e(b)}</span></h1>`;
+const page=(x,c="")=>`<main class="w pg ${c}">${x}</main>`;
+const form=()=>{const u=auth?.currentUser;return `<form id="cf" class="g" style="--c:.6fr 1fr;margin-top:96px;border-top:1px solid rgba(0,0,0,.2);padding-top:28px">${lab("02","form_lbl")}<div style="display:grid;gap:28px;max-width:640px"><div class="g" style="--c:1fr 1fr;gap:28px"><label><span class="mono dim">${e("f_name")}</span><input name="name" required maxlength="100" value="${esc(u?u.email.split("@")[0]:"")}"></label><label><span class="mono dim">${e("f_email")}</span><input name="email" type="email" required maxlength="150" value="${esc(u?.email||"")}"></label></div><label><span class="mono dim">${e("f_msg")}</span><textarea name="message" required maxlength="2000" rows="5"></textarea></label><div><button class="btn" type="submit" style="padding:14px 28px;background:#000;color:#fff">${e("f_send")}</button> <span id="fs" class="s"></span>${EDIT?`<p class="s dim" style="margin-top:12px">${e("f_ok")}</p>`:""}</div></div></form>`};
+const authBtn=()=>{const u=auth?.currentUser;return u?`<span class="mono nm">${isAdmin(u)?"Editor":"Signed in"} · ${esc(u.email)}</span><button class="btn" id="adm">Sign out</button>`:`<button class="btn" id="adm">${e("signin")}</button>`};
+const P={
+home:()=>{const p=S.projects.slice(0,2);return `<main>
+<section class="w g" style="--c:1fr 1.1fr;align-items:end;padding-top:112px;padding-bottom:112px"><div class="rise">${lab("00","heroLabel")}<h1 class="hh" style="font-size:clamp(2.7rem,7.2vw,8.2rem);line-height:.95;letter-spacing:-.035em;max-width:720px">${e("heroTitle")}</h1><p class="m" style="margin-top:36px;max-width:448px;font-size:18px;line-height:1.75">${e("heroBody")}</p><div style="margin-top:40px;display:flex;flex-wrap:wrap;gap:28px">${al("about","cta_how")}${al("projects","cta_work")}</div></div>
+<div class="rise hv"><div class="hvm" data-im="t:heroImg">${itag(S.t.heroImg??D.heroImg,"Lokhit field work")||mono("")}</div><span class="mono hvc">${e("coord")}</span><div class="mono pre hvp">${e("heroCap")}</div><div class="hvt"><img src="${A}logo.png" alt=""></div></div></section>
+<section class="band"><div class="w g" style="--c:.5fr 1.3fr 1fr;padding-top:80px;padding-bottom:80px">${lab("01","prem_lbl")}<p class="serif" style="font-size:clamp(2.2rem,4.5vw,3.75rem);line-height:.98;letter-spacing:-.025em;max-width:768px">${e("missionTitle")}</p><p class="m s" style="max-width:384px">${e("missionBody")}</p></div></section>
+<section class="w g approach-section" style="--c:.65fr 1fr 1.2fr;padding-top:128px;padding-bottom:128px">${lab("02","way_lbl")}<div><h2 class="big" style="font-size:clamp(2.2rem,5.5vw,4.5rem)">${e("approachTitle")}</h2><p class="m" style="margin:32px 0 36px;max-width:448px;line-height:1.75">${e("approachBody")}</p>${al("about","cta_more")}</div><div class="note-images" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-self:end">${timg("img1","ar","Field notes").replace('class="ar"','class="ar" style="background:#000"')}${timg("img2","ar","Working notes").replace('class="ar"','class="ar" style="margin-top:48px"')}</div></section>
+<section class="blk" style="padding:112px 0"><div class="w"><div class="wkh" style="display:flex;justify-content:space-between;align-items:flex-end">${lab("03","work_lbl")}<div class="mono pre" style="text-align:right;color:rgba(255,255,255,.4)">${e("work_side")}</div></div><div class="g" style="--c:1fr 1fr;gap:56px">${p.map((x,i)=>`<a href="#/projects" class="pj"><div class="mono">0${i+1} · ${f("projects",i,"year")}</div><h3>${f("projects",i,"title")}</h3><p>${f("projects",i,"summary")}</p><span class="mono">${e("view_project")} ↗</span></a>`).join("")}</div><div style="margin-top:56px">${al("projects","cta_all")}</div></div></section>
+<section class="w g" style="--c:1fr 1fr;padding-top:112px;padding-bottom:112px"><div>${lab("04","take_lbl")}<h2 class="big" style="font-size:clamp(2.2rem,5.5vw,4.5rem);max-width:672px">${e("take_h")}</h2></div><div style="display:flex;flex-direction:column;justify-content:flex-end"><p class="m" style="max-width:448px;line-height:1.75">${e("take_p")}</p><div style="margin-top:32px">${al("contact","cta_start")}</div></div></section></main>`},
+about:()=>`<main><section class="w" style="padding-top:128px;padding-bottom:112px">${lab("01","about_lbl")}<h1 class="hh" style="font-size:clamp(2.7rem,7.2vw,8.2rem);max-width:1024px">${e("about_a")}<br><span class="dim">${e("about_b")}</span></h1><p class="m" style="margin:48px 0 0 25%;max-width:576px;font-size:18px;line-height:1.8">${e("missionBody")}</p></section>
+<section class="band"><div class="w g" style="--c:1fr 1fr;padding-top:96px;padding-bottom:96px"><div>${lab("02","why_lbl")}<h2 class="big" style="font-size:clamp(2.2rem,5.5vw,4.5rem);max-width:448px">${e("why_h")}</h2></div><div class="s" style="max-width:448px;color:rgba(0,0,0,.65)"><p>${e("why_p1")}</p><p style="margin-top:28px">${e("why_p2")}</p></div></div></section>
+<section class="w g" style="--c:.6fr 1fr;padding-top:128px;padding-bottom:128px">${lab("03","how_lbl")}<div>${[1,2,3].map(n=>`<div class="row g" style="--c:60px 1fr;gap:16px"><span class="mono" style="color:rgba(0,0,0,.45)">0${n}</span><div><h3 style="font-size:30px">${e("s"+n+"t")}</h3><p class="s" style="margin-top:8px;max-width:448px;color:rgba(0,0,0,.55)">${e("s"+n+"b")}</p></div></div>`).join("")}</div></section>
+<section class="w" style="padding-top:112px;padding-bottom:128px;border-top:1px solid rgba(0,0,0,.15)">${lab("04","team_lbl")}<div class="g" style="--c:1fr auto;align-items:end"><h2 class="hh" style="font-size:clamp(2.4rem,7vw,6.5rem)">${e("team_a")}<br><span class="dim">${e("team_b")}</span></h2><p class="s" style="max-width:320px;color:rgba(0,0,0,.55)">${e("team_p")}</p></div><div class="g" style="--c:1fr 1fr;gap:80px;margin-top:80px">${S.team.map((x,i)=>`<article style="${i%2?"margin-top:128px":""}">${ctl("team",i)}${limg("team",i,"imagePath","ar",x.name)}<div style="display:flex;justify-content:space-between;margin-top:20px"><div><h2 style="font-size:36px;letter-spacing:-.03em">${f("team",i,"name")}</h2><p class="mono" style="margin-top:4px;color:rgba(0,0,0,.45)">${f("team",i,"role")}</p></div><span class="mono dim">0${i+1}</span></div><p class="s m" style="margin-top:20px;max-width:448px">${f("team",i,"bio")}</p></article>`).join("")}</div>${addb("team")}</section></main>`,
+projects:()=>page(`${lab("01","pr_lbl")}<div class="g" style="--c:1fr auto;align-items:end"><h1 class="hh">${e("pr_a")}<br><span class="dim">${e("pr_b")}</span></h1><p class="s" style="max-width:320px;color:rgba(0,0,0,.55)">${e("pr_p")}</p></div><div style="margin-top:80px;border-top:1px solid rgba(0,0,0,.2)">${S.projects.map((p,i)=>`<article class="g" style="--c:100px 1fr 1.1fr;padding:56px ${p.featured?"28px":"0"};margin:0 ${p.featured?"-28px":"0"};border-bottom:1px solid rgba(0,0,0,.2);${p.featured?"background:var(--g)":""}"><div class="mono" style="color:rgba(0,0,0,.45)">${ctl("projects",i)}0${i+1}<br>${f("projects",i,"year")}<br>${f("projects",i,"location")}</div><div><h2 style="font-size:clamp(2.2rem,4vw,3.75rem);line-height:.95;letter-spacing:-.03em;max-width:512px">${f("projects",i,"title")}</h2><p class="s" style="margin-top:16px;max-width:448px;color:rgba(0,0,0,.55)">${f("projects",i,"summary")}</p></div><div style="max-width:448px"><p class="s" style="color:rgba(0,0,0,.65)">${f("projects",i,"body")}</p><span class="mono" style="display:block;margin-top:32px">${e("field_note")} ↘</span></div></article>`).join("")}</div>${addb("projects")}`),
+kits:()=>page(`${lab("01","kt_lbl")}<div class="g" style="--c:1.1fr .8fr;align-items:end"><h1 class="hh">${e("kt_a")}<br><span class="dim">${e("kt_b")}</span></h1><p class="s" style="max-width:384px;color:rgba(0,0,0,.55)">${e("kt_p")}</p></div><div class="g" style="--c:1fr 1fr;gap:48px;margin-top:80px">${S.kits.map((k,i)=>{const im=k.imagePaths||[],o=open[i]&&im[1],src=im[o?1:0]||im[0]||A+"jute-folder.png";return `<article style="${i%2?"margin-top:112px":""}">${ctl("kits",i)}<div class="kit" data-kit="${i}" data-im="l:kits:${i}:imagePaths">${itag(src,k.title)}<span class="tag">${e(o?"v_closed":"v_open")} ›</span></div><div style="display:flex;justify-content:space-between;margin-top:20px"><div><p class="mono" style="color:rgba(0,0,0,.45)">${f("kits",i,"category")} · ${f("kits",i,"year")}</p><h2 style="font-size:36px;line-height:.95;letter-spacing:-.03em;margin-top:12px">${f("kits",i,"title")}</h2><p class="s" style="margin-top:12px;max-width:448px;color:rgba(0,0,0,.55)">${f("kits",i,"summary")}</p></div><span>↗</span></div><p class="s" style="margin-top:20px;max-width:448px;color:rgba(0,0,0,.65)">${f("kits",i,"body")}</p></article>`}).join("")}</div>${addb("kits")}`),
+contact:()=>page(`${lab("01","ct_lbl")}<div class="g" style="--c:1.3fr .7fr"><h1 class="hh" style="font-size:clamp(2.7rem,9vw,9rem);line-height:.92">${e("ct_a")}<br><span class="dim">${e("ct_b")}</span></h1><div style="align-self:end"><p class="s" style="max-width:384px;color:rgba(0,0,0,.6)">${e("ct_p")}</p><a class="mono" data-mail href="mailto:${esc(S.t.contactEmail)}" style="display:inline-block;margin-top:36px;border-bottom:1px solid #000;padding-bottom:8px">✉ ${e("contactEmail")}</a></div></div>${form()}<div class="g" style="--c:1fr 1fr 1fr;margin-top:96px;border-top:1px solid rgba(0,0,0,.2);padding-top:28px"><div><p class="mono" style="color:rgba(0,0,0,.45)">${e("studio")}</p><p class="serif pre" style="margin-top:16px;font-size:24px;line-height:1.3">${e("studio_v")}</p></div><div><p class="mono" style="color:rgba(0,0,0,.45)">${e("part_lbl")}</p><p class="s" style="margin-top:16px;max-width:320px;color:rgba(0,0,0,.6)">${e("part_v")}</p></div><div><p class="mono" style="color:rgba(0,0,0,.45)">${e("resp_lbl")}</p><p class="s" style="margin-top:16px;max-width:320px;color:rgba(0,0,0,.6)">${e("resp_v")}</p></div></div>`)};
+const links=[["about","nav_about"],["projects","nav_projects"],["delegate-kits","nav_kits"],["contact","nav_contact"]];
+const shell=x=>`<header><div class="w"><a class="brand" href="#/"><img src="${A}logo.png" alt="Lokhit Foundation mark"><div><span>${e("brand1")}</span><i>${e("brand2")}</i></div></a><nav class="nav" id="nv">${links.map(([h,k])=>`<a href="#/${h}">${e(k)}</a>`).join("")}</nav><div style="display:flex;align-items:center;gap:14px">${authBtn()}<button id="burger" aria-label="Menu">☰</button></div></div></header>${x}
+<footer><div class="w"><div class="g" style="--c:1.5fr 1fr 1fr;gap:40px"><div><img src="${A}logo.png" alt="" style="height:34px;width:auto"><p class="serif" style="margin-top:20px;max-width:384px;font-size:24px;line-height:1.05;color:rgba(255,255,255,.85)">${e("foot_tag")}</p></div><div><p class="mono">${e("foot_find")}</p><div style="display:grid;gap:8px;margin-top:16px;font-size:14px">${links.filter(l=>l[0]!="team").map(([h,k])=>`<a href="#/${h}">${e(k)}</a>`).join("")}</div></div><div><p class="mono">${e("foot_based")}</p><p class="s pre" style="margin-top:16px">${e("foot_loc")}</p><a class="s" data-mail href="mailto:${esc(S.t.contactEmail)}" style="display:inline-block;margin-top:20px">✉ ${e("contactEmail")}</a></div></div><div class="fb mono"><span>© ${new Date().getFullYear()} ${e("foot_copy")}</span><span>${e("foot_made")}</span></div></div></footer>`;
+function route(){const r=(location.hash.replace(/^#\/?/,"")||"home").split("?")[0];return r=="team"?"about":r}
+function render(){const r=route(),k=r=="delegate-kits"?"kits":r;document.getElementById("app").innerHTML=shell((P[k]||P.home)());document.body.classList.toggle("edit",EDIT);
+ if(EDIT)document.querySelectorAll("[data-k],[data-l][data-f]").forEach(el=>el.contentEditable="plaintext-only");
+ document.getElementById("adm").onclick=()=>auth?.currentUser?signOut(auth):live?openAuth():alert("Add your Firebase config in firebase-config.js to enable sign-in.");
+ document.getElementById("burger").onclick=()=>document.getElementById("nv").classList.toggle("o");hydrate()}
+addEventListener("hashchange",()=>{render();scrollTo(0,0)});
+// ---- saving ----
+const st=m=>document.getElementById("st").textContent=m;
+async function save(p){cacheContent();if(!firebaseReady||!ref)return;st("Saving…");try{await setDoc(ref,p,{merge:true});st("Saved ✓");cacheContent()}catch(x){st("Save failed: "+(x.code||"error"))}}
+document.addEventListener("focusout",ev=>{const el=ev.target;if(!EDIT||!el.dataset)return;const v=el.textContent.trim();
+ if(el.dataset.k){const k=el.dataset.k;if(S.t[k]===v)return;S.t[k]=v;save({t:{[k]:v}})}
+ else if(el.dataset.l&&el.dataset.f){const{l,i,f:fl}=el.dataset;if(S[l][i][fl]===v)return;S[l][i][fl]=v;save({[l]:S[l]})}});
+document.addEventListener("keydown",ev=>{if(EDIT&&ev.key=="Enter"&&ev.target.isContentEditable&&!ev.shiftKey&&!ev.target.closest(".pre")){ev.preventDefault();ev.target.blur()}});
+const getPath=q=>{const a=q.split(":");if(a[0]=="t")return S.t[a[1]];const o=S[a[1]][a[2]];return a[4]!==undefined?(o[a[3]]||[])[+a[4]]:o[a[3]]};
+const setPath=(q,v)=>{const a=q.split(":");if(a[0]=="t"){S.t[a[1]]=v;save({t:{[a[1]]:v}})}else{const o=S[a[1]][a[2]];if(a[4]!==undefined)(o[a[3]]=o[a[3]]||["",""])[+a[4]]=v;else o[a[3]]=v;save({[a[1]]:S[a[1]]})}};
+const shrink=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,1200/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(i,0,0,c.width,c.height);ok(c.toDataURL("image/jpeg",.78))};i.onerror=no;i.src=r.result};r.readAsDataURL(f)});
+function pickImg(q,alt){if(alt){const v=prompt("Image URL or path (empty to clear):",getPath(q)||"");if(v!==null){setPath(q,v.trim());render()}return}
+ if(!firebaseReady)return alert("Firebase is still connecting. Please try again in a moment.");
+ const i=document.createElement("input");i.type="file";i.accept="image/*";i.onchange=async()=>{const fl=i.files[0];if(!fl)return;try{st("Uploading…");const d=await shrink(fl),id=Date.now().toString(36),old=getPath(q);await setDoc(doc(db,"images",id),{data:d});IM[id]=d;setPath(q,"fb:"+id);if(old?.startsWith("fb:"))deleteDoc(doc(db,"images",old.slice(3))).catch(()=>{});render()}catch(x){st("Upload failed: "+(x.code||x.message))}};i.click()}
+document.addEventListener("click",ev=>{const t=ev.target,k=t.closest("[data-kit]");
+ if(k&&!t.closest("[data-a]")){open[k.dataset.kit]=!open[k.dataset.kit];render();return}
+ if(EDIT){const b=t.closest("[data-a]");
+  if(b){ev.preventDefault();const{a,l,i}=b.dataset,n=+i,arr=S[l];
+   if(a=="img")return pickImg(b.dataset.p,ev.altKey);
+   if(a=="add")arr.push(JSON.parse(JSON.stringify(NEW[l])));if(a=="del"&&confirm("Delete this item?"))arr.splice(n,1);
+   if(a=="up"&&n>0)[arr[n-1],arr[n]]=[arr[n],arr[n-1]];if(a=="dn"&&n<arr.length-1)[arr[n+1],arr[n]]=[arr[n],arr[n+1]];
+   if(a=="ft")arr[n].featured=!arr[n].featured;save({[l]:arr});render();return}
+  const im=t.closest("[data-im]");if(im){ev.preventDefault();pickImg(im.dataset.im,ev.altKey);return}
+  if(t.closest("[contenteditable]")&&t.closest("a"))ev.preventDefault();return}
+ if(t.closest("a[href^='#']")||t.closest("#nv"))document.getElementById("nv")?.classList.remove("o")});
+document.addEventListener("submit",async ev=>{if(ev.target.id!="cf")return;ev.preventDefault();if(EDIT)return;const fs=document.getElementById("fs"),d=Object.fromEntries(new FormData(ev.target));
+ if(!firebaseReady){fs.textContent="Messages are temporarily unavailable. Please try again in a moment.";return}
+ try{fs.textContent="Sending…";await addDoc(collection(db,"messages"),{name:d.name.trim(),email:d.email.trim(),message:d.message.trim(),uid:auth.currentUser?.uid||null,at:serverTimestamp()});ev.target.reset();fs.textContent=S.t.f_ok??D.f_ok}catch(x){fs.textContent="Could not send ("+(x.code||"error")+")"}});
+// ---- editor bar / auth ----
+function bar(){const b=document.getElementById("bar");b.style.display="flex";document.getElementById("tg").textContent=EDIT?"Turn off":"Turn on";st(EDIT?"Edit mode — click any text":"Edit mode off")}
+document.getElementById("tg").onclick=()=>{EDIT=!EDIT;render();bar()};
+document.getElementById("cx").onclick=()=>document.getElementById("dlg").close();
+let reg=false;const dm=()=>{dt.textContent=sb.textContent=reg?"Create account":"Sign in";sw.textContent=reg?"I already have an account":"Create an account"};
+function openAuth(){reg=false;dm();er.textContent="";dlg.showModal()}
+sw.onclick=()=>{reg=!reg;dm()};
+lf.onsubmit=async ev=>{ev.preventDefault();try{await(reg?createUserWithEmailAndPassword:signInWithEmailAndPassword)(auth,em.value,pw.value);pw.value="";dlg.close()}catch(x){er.textContent=({"auth/invalid-credential":"Wrong email or password.","auth/email-already-in-use":"That email already has an account — sign in instead.","auth/weak-password":"Use at least 6 characters."})[x.code]||"Failed ("+x.code+")"}};
+const showMsgs=()=>{ml.innerHTML=MSG.length?MSG.map(m=>`<div style="border-bottom:1px solid #ccc;padding:14px 0"><p class="mono">${esc(m.name)} · <a href="mailto:${esc(m.email)}">${esc(m.email)}</a> · ${m.at?.toDate?m.at.toDate().toLocaleString():""}</p><p class="s" style="margin:8px 0;white-space:pre-wrap">${esc(m.message)}</p><button class="btn" data-del="${m.id}">Delete</button></div>`).join(""):"<p class='s'>No messages yet.</p>"};
+function watchMsgs(on){unsubM?.();unsubM=null;if(!on)return;unsubM=onSnapshot(query(collection(db,"messages"),orderBy("at","desc")),s=>{MSG=s.docs.map(d=>({id:d.id,...d.data()}));mb.textContent="Messages ("+MSG.length+")";if(inb.open)showMsgs()})}
+mb.onclick=()=>{showMsgs();inb.showModal()};ix.onclick=()=>inb.close();
+ml.onclick=async ev=>{const id=ev.target.dataset.del;if(id&&confirm("Delete this message?"))await deleteDoc(doc(db,"messages",id))};
+document.getElementById("pgs").onchange=ev=>{location.hash="#/"+ev.target.value};
+document.getElementById("so").onclick=()=>signOut(auth);
+function merge(d){S={t:{...D,...(d?.t||{})},projects:Array.isArray(d?.projects)?d.projects:S.projects,kits:Array.isArray(d?.kits)?d.kits:S.kits,team:Array.isArray(d?.team)?d.team:S.team}}
+const G={};const gate=k=>{G[k]=1;if(G.d&&G.a)ready()};
+
+// Render immediately. Firebase is an enhancement, never a prerequisite.
+loadCached();
+try{render();ready()}catch(x){
+  console.error("Initial render failed",x);
+  document.getElementById("app").innerHTML='<main class="w pg"><h1 class="hh">Lokhit Foundation</h1><p class="s" style="margin-top:24px">The website could not render this page. Please refresh once.</p></main>';
+  ready();
+}
+
+async function bootFirebase(){
+  if(!C || /^YOUR/.test(C.apiKey||""))return;
+  try{
+    const [fbApp,fbStore,fbAuth]=await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js")
+    ]);
+    ({initializeApp}=fbApp);
+    ({getFirestore,doc,onSnapshot,setDoc,getDoc,getDocFromCache,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,deleteDoc,query,orderBy,serverTimestamp}=fbStore);
+    ({getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut}=fbAuth);
+
+    const app=initializeApp(C);
+    try{
+      db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
+    }catch(x){
+      db=getFirestore(app);
+    }
+    auth=getAuth(app);
+    ref=doc(db,"site","content");
+    firebaseReady=true;
+    live=true;
+
+    // Read the cache first when available, then keep it live with Firestore.
+    try{
+      const cached=await getDocFromCache(ref);
+      if(cached.exists()){
+        merge(cached.data());
+        cacheContent();
+        LAST=JSON.stringify(S);
+        if(!busy())render();
+      }
+    }catch(e){}
+
+    onSnapshot(ref,s=>{
+      if(s.exists())merge(s.data());
+      cacheContent();
+      const g=JSON.stringify(S);
+      if(g!==LAST){
+        LAST=g;
+        if(!busy())render();
+      }
+    },err=>console.warn("Firestore listener unavailable",err));
+
+    onAuthStateChanged(auth,u=>{
+      const ad=isAdmin(u);
+      EDIT=ad;
+      document.getElementById("bar").style.display=ad?"flex":"none";
+      if(ad)bar();
+      watchMsgs(ad);
+      render();
+    });
+  }catch(x){
+    console.warn("Firebase unavailable; keeping the cached/static site active.",x);
+    firebaseReady=false;
+    live=false;
+    db=auth=ref=null;
+  }
+}
+bootFirebase();
 function fbLoad(id){return IM[id]?Promise.resolve(IM[id]):IMP[id]||(IMP[id]=(async()=>{const r=doc(db,"images",id);let s;try{s=await getDocFromCache(r)}catch(x){s=await getDoc(r)}return IM[id]=s.data()?.data||""})())}
 function hydrate(){if(!live)return;document.querySelectorAll("img[data-fb]").forEach(img=>fbLoad(img.dataset.fb).then(d=>{if(d&&!img.src){img.onload=()=>img.classList.add("ld");img.src=d}}).catch(()=>{}))}
 const timg=(k,c,alt,fb)=>`<div class="${c}" data-im="t:${k}">${itag(S.t[k]??D[k],alt)||fb||mono("")}</div>`;
