@@ -1,40 +1,1003 @@
-import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,doc,onSnapshot,setDoc,collection,addDoc,deleteDoc,query,orderBy,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {firebaseConfig as C} from "./firebase-config.js"; 
-const live=!/^YOUR/.test(C.apiKey);let db,auth,ref,unsubM,MSG=[],IM={};
-const isAdmin=u=>!!u&&!!C.adminEmail&&u.email?.toLowerCase()==C.adminEmail.toLowerCase();
-const busy=()=>{const a=document.activeElement;return a&&(a.isContentEditable||/^(INPUT|TEXTAREA)$/.test(a.tagName))};
-const A="assets/lokhit-";
-// ---- default content (every string here is editable and saved to Firestore doc site/content) ----
-const D={nav_about:"About",nav_projects:"Projects",nav_kits:"Delegate kits",nav_contact:"Contact",signin:"Sign in",brand1:"Lokhit",brand2:"Foundation",
-heroLabel:"Jaipur · Rajasthan",heroTitle:"Planting trees is the work. Keeping them alive is the promise.",heroBody:"Lokhit works with schools, neighbourhoods and local stewards to bring shade back to Jaipur — one considered site at a time.",cta_how:"How we work",cta_work:"See the work",heroCap:"A foundation for\nthe places we share",coord:"26°54′N",heroImg:"",
-prem_lbl:"The premise",missionTitle:"The city is a living thing.",missionBody:"We plant where a tree can become part of daily life: beside a classroom, along a dusty edge, in the shared space between homes. The work is measured in care, not ceremony.",
-way_lbl:"A way of working",approachTitle:"Start with the ground.",approachBody:"We listen to the people who use a place, choose what can survive there, then return to water, mulch and tend every sapling until it can stand on its own.",cta_more:"More about our approach",img1:A+"a6-chitpad.png",img2:A+"a5-notepad.png",
-work_lbl:"Selected work",work_side:"What is planted\nis tended",view_project:"View project",cta_all:"All projects",take_lbl:"Take part",take_h:"Bring a little more shade into the picture.",take_p:"A project can start with a school, a street, a team or a conversation. If you have a place in mind, we would like to hear about it.",cta_start:"Start a conversation",
-foot_tag:"A little more shade for the places we share.",foot_find:"Find your way",foot_based:"Based in",foot_loc:"Jaipur, Rajasthan\nIndia",contactEmail:"hello@lokhitfoundation.org",foot_copy:"Lokhit Foundation",foot_made:"Made for the long view",
-about_lbl:"About Lokhit",about_a:"The work is simple.",about_b:"The conditions are not.",why_lbl:"Why trees",why_h:"A tree is public infrastructure.",why_p1:"It cools a courtyard. It catches dust. It gives a child a place to wait. It makes the distance between two houses feel inhabitable.",why_p2:"In Jaipur, the right tree in the right place is not decoration. It is a daily act of resilience — and it asks for more than a photograph on planting day.",how_lbl:"How we plant",
-s1t:"Read the place",s1b:"We begin with heat, water, footfall and the people who already care for a site.",s2t:"Choose what lasts",s2b:"Species, spacing and soil are decisions made for the conditions — not the brochure.",s3t:"Return often",s3b:"The first season is the beginning. We build simple routines that make care visible and shared.",
-team_lbl:"The people behind the work",team_a:"Small team.",team_b:"Long attention.",team_p:"Lokhit is built around two kinds of work: being present in the field, and making it possible for others to show up well.",
-pr_lbl:"Work archive",pr_a:"Places we",pr_b:"have tended.",pr_p:"Projects are collaborations with a place. Read the notes, then tell us what your street needs.",field_note:"Field note",
-kt_lbl:"Delegate-kit partnerships",kt_a:"Useful objects.",kt_b:"Useful partnerships.",kt_p:"A delegate kit is often the first physical point of contact. We make that moment carry a little more thought — and a little less waste.",v_open:"View open",v_closed:"View closed",
-ct_lbl:"Contact",ct_a:"Tell us what",ct_b:"could grow here.",ct_p:"Have a site, a team or a question? We are based in Jaipur and open to useful conversations.",studio:"Studio",studio_v:"Jaipur, Rajasthan\nIndia",part_lbl:"For partnerships",part_v:"Delegate kits, planting projects, field collaborations and thoughtful ways to support the work.",resp_lbl:"Response time",resp_v:"We read every note. Give us a little context and we will write back.",form_lbl:"Write to us",f_name:"Your name",f_email:"Email",f_msg:"Message",f_send:"Send message",f_ok:"Thank you — your note has reached us. We will write back soon."};
-const L={projects:[{title:"Schoolyard shade study",summary:"A living canopy for the hours between lessons.",body:"We work alongside school communities to identify the hottest edges, select resilient native species and build simple watering routines students can own.",imagePath:"",location:"Jaipur",year:"2024",featured:true},{title:"The street edge, restored",summary:"Turning leftover ground into a place to pause.",body:"A small planting intervention can change the way a lane is used. This project pairs street-level planting with resident stewardship and a clear maintenance rhythm.",imagePath:"",location:"Sanganer",year:"2023",featured:false}],
-kits:[{title:"Jute field folder",summary:"A useful object with a lower footprint.",body:"Designed for conference days and field notes, the jute folder carries the quiet tactility of a material chosen with purpose.",imagePaths:[A+"jute-folder.png",A+"jute-folder-open.png"],category:"Material study",year:"2024"},{title:"The diplomat’s desk",summary:"A set of paper goods for considered work.",body:"Notepads and tearable chit-pads that invite a second look, made for partners who prefer the analogue to the disposable.",imagePaths:[A+"a5-notepad.png",A+"a6-chitpad.png"],category:"Paper goods",year:"2024"},{title:"Semi-leather folio",summary:"A reusable companion for the long meeting.",body:"A restrained folio that gets better with use. The object is a reminder: a partnership should leave something useful behind.",imagePaths:[A+"leather-folder.png",A+"leather-folder-open.png"],category:"Material study",year:"2023"}],
-team:[{name:"Aarav Pandey",role:"Founder & field lead",bio:"Aarav turns long walks through Jaipur into planting plans. His work is rooted in patient observation, local knowledge and the belief that public space belongs to everyone.",imagePath:""},{name:"Daksh Wadekar",role:"Partnerships & operations",bio:"Daksh builds the practical bridges that make good work repeatable — with schools, teams, institutions and the people who keep a place alive after planting day.",imagePath:""}]};
-const NEW={projects:{title:"New project",summary:"Short summary",body:"Details about the project.",imagePath:"",location:"Jaipur",year:"2025",featured:false},kits:{title:"New kit",summary:"Short summary",body:"Details about the kit.",imagePaths:["",""],category:"Category",year:"2025"},team:{name:"New person",role:"Role",bio:"Short bio.",imagePath:""}};
-let S={t:{...D},...JSON.parse(JSON.stringify(L))},EDIT=false,open={};
-const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const e=k=>`<span data-k="${k}">${esc(S.t[k]??D[k])}</span>`;
-const f=(l,i,fl)=>`<span data-l="${l}" data-i="${i}" data-f="${fl}">${esc(S[l][i][fl])}</span>`;
-const mp=p=>p?esc(p.startsWith("fb:")?(IM[p.slice(3)]||""):p):"";
-const lab=(n,k)=>`<div class="lab"><b>${n}</b>${e(k)}</div>`;
-const al=(h,k)=>`<a class="al" href="#/${h}">${e(k)} <span>↗</span></a>`;
-const mono=c=>`<div class="ph ${c}"><img src="${A}logo.png" alt=""></div>`;
-const timg=(k,c,alt,fb)=>{const v=S.t[k]??D[k];return v?`<div class="${c}" data-im="t:${k}"><img class="gs" src="${mp(v)}" alt="${alt}"></div>`:`<div class="${c}" data-im="t:${k}">${fb||mono("")}</div>`};
-const limg=(l,i,fl,c,alt)=>{const v=S[l][i][fl];return `<div class="${c}" data-im="l:${l}:${i}:${fl}">${v?`<img class="gs" src="${mp(v)}" alt="${esc(alt)}">`:mono("")}</div>`};
-const ctl=(l,i)=>`<div class="ctl"><button data-a="up" data-l="${l}" data-i="${i}">↑</button><button data-a="dn" data-l="${l}" data-i="${i}">↓</button>${l=="projects"?`<button data-a="ft" data-l="${l}" data-i="${i}">★ ${S[l][i].featured?"featured":"feature"}</button>`:""}${l=="kits"?`<button data-a="img" data-p="l:kits:${i}:imagePaths:0">🖼 closed image</button><button data-a="img" data-p="l:kits:${i}:imagePaths:1">🖼 open image</button>`:""}<button data-a="del" data-l="${l}" data-i="${i}">✕ delete</button></div>`;
-const fix=v=>v.replace(/^(assets\/lokhit-(?!logo)[\w-]+)\.png$/,"$1.jpg");
+import {
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+import {
+  getFirestore,
+  doc,
+  onSnapshot,
+  setDoc,
+  addDoc,
+  collection,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+import {
+  firebaseConfig as C,
+  ADMIN_EMAIL
+} from "./firebase-config.js";
+
+
+const live = !/^YOUR/.test(C.apiKey);
+
+let db,
+    auth,
+    ref,
+    storage,
+    CURRENT_USER = null;
+
+const A = "assets/lokhit-";
+
+
+/* =========================================================
+   DEFAULT CONTENT
+   ========================================================= */
+
+const D = {
+
+  nav_about:"About",
+  nav_team:"Team",
+  nav_projects:"Projects",
+  nav_kits:"Delegate kits",
+  nav_contact:"Contact",
+
+  editor:"Sign in",
+
+  brand1:"Lokhit",
+  brand2:"Foundation",
+
+  heroLabel:"Jaipur · Rajasthan",
+
+  heroTitle:
+    "Planting trees is the work. Keeping them alive is the promise.",
+
+  heroBody:
+    "Lokhit works with schools, neighbourhoods and local stewards to bring shade back to Jaipur — one considered site at a time.",
+
+  cta_how:"How we work",
+  cta_work:"See the work",
+
+  heroCap:
+    "A foundation for\nthe places we share",
+
+  coord:"26°54′N",
+
+  heroImg:"",
+
+  prem_lbl:"The premise",
+
+  missionTitle:
+    "The city is a living thing.",
+
+  missionBody:
+    "We plant where a tree can become part of daily life: beside a classroom, along a dusty edge, in the shared space between homes. The work is measured in care, not ceremony.",
+
+  way_lbl:"A way of working",
+
+  approachTitle:
+    "Start with the ground.",
+
+  approachBody:
+    "We listen to the people who use a place, choose what can survive there, then return to water, mulch and tend every sapling until it can stand on its own.",
+
+  cta_more:"More about our approach",
+
+  img1:A+"a6-chitpad.png",
+  img2:A+"a5-notepad.png",
+
+  work_lbl:"Selected work",
+
+  work_side:
+    "What is planted\nis tended",
+
+  view_project:"View project",
+  cta_all:"All projects",
+
+  take_lbl:"Take part",
+
+  take_h:
+    "Bring a little more shade into the picture.",
+
+  take_p:
+    "A project can start with a school, a street, a team or a conversation. If you have a place in mind, we would like to hear about it.",
+
+  cta_start:"Start a conversation",
+
+  foot_tag:
+    "A little more shade for the places we share.",
+
+  foot_find:"Find your way",
+
+  foot_based:"Based in",
+
+  foot_loc:
+    "Jaipur, Rajasthan\nIndia",
+
+  contactEmail:
+    "hello@lokhitfoundation.org",
+
+  foot_copy:"Lokhit Foundation",
+  foot_made:"Made for the long view",
+
+  about_lbl:"About Lokhit",
+
+  about_a:
+    "The work is simple.",
+
+  about_b:
+    "The conditions are not.",
+
+  why_lbl:"Why trees",
+
+  why_h:
+    "A tree is public infrastructure.",
+
+  why_p1:
+    "It cools a courtyard. It catches dust. It gives a child a place to wait. It makes the distance between two houses feel inhabitable.",
+
+  why_p2:
+    "In Jaipur, the right tree in the right place is not decoration. It is a daily act of resilience — and it asks for more than a photograph on planting day.",
+
+  how_lbl:"How we plant",
+
+  s1t:"Read the place",
+
+  s1b:
+    "We begin with heat, water, footfall and the people who already care for a site.",
+
+  s2t:"Choose what lasts",
+
+  s2b:
+    "Species, spacing and soil are decisions made for the conditions — not the brochure.",
+
+  s3t:"Return often",
+
+  s3b:
+    "The first season is the beginning. We build simple routines that make care visible and shared.",
+
+  team_lbl:
+    "The people behind the work",
+
+  team_a:"Small team.",
+
+  team_b:"Long attention.",
+
+  team_p:
+    "Lokhit is built around two kinds of work: being present in the field, and making it possible for others to show up well.",
+
+  pr_lbl:"Work archive",
+
+  pr_a:"Places we",
+
+  pr_b:"have tended.",
+
+  pr_p:
+    "Projects are collaborations with a place. Read the notes, then tell us what your street needs.",
+
+  field_note:"Field note",
+
+  kt_lbl:
+    "Delegate-kit partnerships",
+
+  kt_a:"Useful objects.",
+
+  kt_b:"Useful partnerships.",
+
+  kt_p:
+    "A delegate kit is often the first physical point of contact. We make that moment carry a little more thought — and a little less waste.",
+
+  v_open:"View open",
+  v_closed:"View closed",
+
+  ct_lbl:"Contact",
+
+  ct_a:"Tell us what",
+
+  ct_b:"could grow here.",
+
+  ct_p:
+    "Have a site, a team or a question? We are based in Jaipur and open to useful conversations.",
+
+  studio:"Studio",
+
+  studio_v:
+    "Jaipur, Rajasthan\nIndia",
+
+  part_lbl:"For partnerships",
+
+  part_v:
+    "Delegate kits, planting projects, field collaborations and thoughtful ways to support the work.",
+
+  resp_lbl:"Response time",
+
+  resp_v:
+    "We read every note. Give us a little context and we will write back."
+
+};
+
+
+/* =========================================================
+   DEFAULT ARRAYS
+   ========================================================= */
+
+const L = {
+
+  projects: [
+
+    {
+      title:"Schoolyard shade study",
+      summary:"A living canopy for the hours between lessons.",
+      body:
+        "We work alongside school communities to identify the hottest edges, select resilient native species and build simple watering routines students can own.",
+      imagePath:"",
+      location:"Jaipur",
+      year:"2024",
+      featured:true
+    },
+
+    {
+      title:"The street edge, restored",
+      summary:"Turning leftover ground into a place to pause.",
+      body:
+        "A small planting intervention can change the way a lane is used. This project pairs street-level planting with resident stewardship and a clear maintenance rhythm.",
+      imagePath:"",
+      location:"Sanganer",
+      year:"2023",
+      featured:false
+    }
+
+  ],
+
+  kits: [
+
+    {
+      title:"Jute field folder",
+      summary:"A useful object with a lower footprint.",
+      body:
+        "Designed for conference days and field notes, the jute folder carries the quiet tactility of a material chosen with purpose.",
+      imagePaths:[
+        A+"jute-folder.png",
+        A+"jute-folder-open.png"
+      ],
+      category:"Material study",
+      year:"2024"
+    },
+
+    {
+      title:"The diplomat’s desk",
+      summary:"A set of paper goods for considered work.",
+      body:
+        "Notepads and tearable chit-pads that invite a second look, made for partners who prefer the analogue to the disposable.",
+      imagePaths:[
+        A+"a5-notepad.png",
+        A+"a6-chitpad.png"
+      ],
+      category:"Paper goods",
+      year:"2024"
+    },
+
+    {
+      title:"Semi-leather folio",
+      summary:"A reusable companion for the long meeting.",
+      body:
+        "A restrained folio that gets better with use. The object is a reminder: a partnership should leave something useful behind.",
+      imagePaths:[
+        A+"leather-folder.png",
+        A+"leather-folder-open.png"
+      ],
+      category:"Material study",
+      year:"2023"
+    }
+
+  ],
+
+  team: [
+
+    {
+      name:"Aarav Pandey",
+      role:"Founder & field lead",
+      bio:
+        "Aarav turns long walks through Jaipur into planting plans. His work is rooted in patient observation, local knowledge and the belief that public space belongs to everyone.",
+      imagePath:""
+    },
+
+    {
+      name:"Daksh Wadekar",
+      role:"Partnerships & operations",
+      bio:
+        "Daksh builds the practical bridges that make good work repeatable — with schools, teams, institutions and the people who keep a place alive after planting day.",
+      imagePath:""
+    }
+
+  ]
+
+};
+
+
+const NEW = {
+
+  projects:{
+    title:"New project",
+    summary:"Short summary",
+    body:"Details about the project.",
+    imagePath:"",
+    location:"Jaipur",
+    year:"2025",
+    featured:false
+  },
+
+  kits:{
+    title:"New kit",
+    summary:"Short summary",
+    body:"Details about the kit.",
+    imagePaths:["",""],
+    category:"Category",
+    year:"2025"
+  },
+
+  team:{
+    name:"New person",
+    role:"Role",
+    bio:"Short bio.",
+    imagePath:""
+  }
+
+};
+
+
+let S = {
+  t:{...D},
+  ...JSON.parse(JSON.stringify(L))
+};
+
+let EDIT = false;
+let open = {};
+
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+
+const esc = s =>
+  String(s ?? "").replace(
+    /[&<>"]/g,
+    c => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;"
+    }[c])
+  );
+
+
+const e = k =>
+  `<span data-k="${k}">${esc(S.t[k] ?? D[k])}</span>`;
+
+
+const f = (l,i,fl) =>
+  `<span data-l="${l}" data-i="${i}" data-f="${fl}">${esc(S[l][i][fl])}</span>`;
+
+
+const mp = p =>
+  p ? esc(p) : "";
+
+
+const lab = (n,k) =>
+  `<div class="lab"><b>${n}</b>${e(k)}</div>`;
+
+
+const al = (h,k) =>
+  `<a class="al" href="#/${h}">${e(k)} <span>↗</span></a>`;
+
+
+const mono = c =>
+  `<div class="ph ${c}">
+    <img src="${A}logo.png" alt="">
+  </div>`;
+
+
+const timg = (k,c,alt,fb) => {
+
+  const v = S.t[k] ?? D[k];
+
+  return v
+
+    ? `<div class="${c}" data-im="t:${k}">
+        <img
+          class="gs"
+          src="${mp(v)}"
+          alt="${alt}"
+        >
+      </div>`
+
+    : `<div class="${c}" data-im="t:${k}">
+        ${fb || mono("")}
+      </div>`;
+};
+
+
+const limg = (l,i,fl,c,alt) => {
+
+  const v = S[l][i][fl];
+
+  return `
+    <div
+      class="${c}"
+      data-im="l:${l}:${i}:${fl}"
+    >
+      ${
+        v
+          ? `<img
+              class="gs"
+              src="${mp(v)}"
+              alt="${esc(alt)}"
+            >`
+          : mono("")
+      }
+    </div>
+  `;
+};
+
+
+const ctl = (l,i) =>
+  `<div class="ctl">
+
+    <button
+      data-a="up"
+      data-l="${l}"
+      data-i="${i}"
+    >
+      ↑
+    </button>
+
+    <button
+      data-a="dn"
+      data-l="${l}"
+      data-i="${i}"
+    >
+      ↓
+    </button>
+
+    ${
+      l == "projects"
+        ? `<button
+            data-a="ft"
+            data-l="${l}"
+            data-i="${i}"
+          >
+            ★ ${S[l][i].featured ? "featured" : "feature"}
+          </button>`
+        : ""
+    }
+
+    <button
+      data-a="del"
+      data-l="${l}"
+      data-i="${i}"
+    >
+      ✕ delete
+    </button>
+
+  </div>`;
+
+
+const addb = l =>
+  `<button
+    class="addb"
+    data-a="add"
+    data-l="${l}"
+  >
+    + Add ${
+      l.slice(0,-1) == "team"
+        ? "person"
+        : l.slice(0,-1)
+    }
+  </button>`;
+
+
+const hero = (a,b,n) =>
+  `<h1 class="hh">
+    ${e(a)}<br>
+    <span class="dim">${e(b)}</span>
+  </h1>`;
+
+
+const page = (x,c="") =>
+  `<main class="w pg ${c}">
+    ${x}
+  </main>`;
+
+
+/* =========================================================
+   PAGES
+   ========================================================= */
+
+const P = {
+
+  home:() => {
+
+    const p =
+      S.projects.slice(0,2);
+
+    return `
+      <main>
+
+        <section
+          class="w g"
+          style="
+            --c:1fr 1.1fr;
+            align-items:end;
+            padding-top:112px;
+            padding-bottom:112px
+          "
+        >
+
+          <div class="rise">
+
+            ${lab("00","heroLabel")}
+
+            <h1
+              class="hh"
+              style="
+                font-size:clamp(4rem,9vw,9.6rem);
+                line-height:.84;
+                letter-spacing:-.055em;
+                max-width:720px
+              "
+            >
+              ${e("heroTitle")}
+            </h1>
+
+            <p
+              class="m"
+              style="
+                margin-top:36px;
+                max-width:448px;
+                font-size:18px;
+                line-height:1.75
+              "
+            >
+              ${e("heroBody")}
+            </p>
+
+            <div
+              style="
+                margin-top:40px;
+                display:flex;
+                flex-wrap:wrap;
+                gap:28px
+              "
+            >
+              ${al("about","cta_how")}
+              ${al("projects","cta_work")}
+            </div>
+
+          </div>
+
+
+          <div
+            class="rise"
+            style="
+              position:relative;
+              min-height:540px
+            "
+          >
+
+            <div
+              style="
+                position:absolute;
+                inset:0 8% 0 0;
+                border:1px solid rgba(0,0,0,.15);
+                background:#deddda
+              "
+            >
+
+              <div
+                style="
+                  position:absolute;
+                  inset:48px;
+                  border:1px solid rgba(0,0,0,.2)
+                "
+              ></div>
+
+              <div
+                class="mono pre"
+                style="
+                  position:absolute;
+                  left:48px;
+                  bottom:48px;
+                  color:rgba(0,0,0,.45)
+                "
+              >
+                ${e("heroCap")}
+              </div>
+
+              <div
+                class="mono"
+                style="
+                  position:absolute;
+                  right:40px;
+                  top:40px;
+                  color:rgba(0,0,0,.45)
+                "
+              >
+                ${e("coord")}
+              </div>
+
+            </div>
+
+            ${timg(
+              "heroImg",
+              "",
+              "Lokhit field work"
+            ).replace(
+              'class=""',
+              'style="position:absolute;right:0;bottom:0;width:65%;height:68%;overflow:hidden"'
+            )}
+
+          </div>
+
+        </section>
+
+
+        <section class="band">
+
+          <div
+            class="w g"
+            style="
+              --c:.5fr 1.3fr 1fr;
+              padding-top:80px;
+              padding-bottom:80px
+            "
+          >
+
+            ${lab("01","prem_lbl")}
+
+            <p
+              class="serif"
+              style="
+                font-size:clamp(2.2rem,4.5vw,3.75rem);
+                line-height:.98;
+                letter-spacing:-.025em;
+                max-width:768px
+              "
+            >
+              ${e("missionTitle")}
+            </p>
+
+            <p
+              class="m s"
+              style="max-width:384px"
+            >
+              ${e("missionBody")}
+            </p>
+
+          </div>
+
+        </section>
+
+
+        <section
+          class="w g"
+          style="
+            --c:.65fr 1fr 1.2fr;
+            padding-top:128px;
+            padding-bottom:128px
+          "
+        >
+
+          ${lab("02","way_lbl")}
+
+          <div>
+
+            <h2
+              class="big"
+              style="
+                font-size:clamp(3rem,5.5vw,4.5rem)
+              "
+            >
+              ${e("approachTitle")}
+            </h2>
+
+            <p
+              class="m"
+              style="
+                margin:32px 0 36px;
+                max-width:448px;
+                line-height:1.75
+              "
+            >
+              ${e("approachBody")}
+            </p>
+
+            ${al("about","cta_more")}
+
+          </div>
+
+
+          <div
+            style="
+              display:grid;
+              grid-template-columns:1fr 1fr;
+              gap:8px;
+              align-self:end
+            "
+          >
+
+            ${timg(
+              "img1",
+              "ar",
+              "Field notes"
+            ).replace(
+              'class="ar"',
+              'class="ar" style="background:#000"'
+            )}
+
+            ${timg(
+              "img2",
+              "ar",
+              "Working notes"
+            ).replace(
+              'class="ar"',
+              'class="ar" style="margin-top:48px"'
+            )}
+
+          </div>
+
+        </section>
+
+
+        <section
+          class="blk"
+          style="padding:112px 0"
+        >
+
+          <div class="w">
+
+            <div
+              style="
+                display:flex;
+                justify-content:space-between;
+                align-items:flex-end
+              "
+            >
+
+              ${lab("03","work_lbl")}
+
+              <div
+                class="mono pre"
+                style="
+                  text-align:right;
+                  color:rgba(255,255,255,.4)
+                "
+              >
+                ${e("work_side")}
+              </div>
+
+            </div>
+
+
+            <div
+              class="g"
+              style="
+                --c:1fr 1fr;
+                gap:0
+              "
+            >
+
+              ${p.map(
+                (x,i) => `
+                  <a
+                    href="#/projects"
+                    class="g"
+                    style="
+                      --c:110px 1fr;
+                      border-top:1px solid rgba(255,255,255,.25);
+                      padding:32px 0;
+                      ${i ? "margin-left:80px" : ""}
+                    "
+                  >
+
+                    <div
+                      class="mono"
+                      style="color:rgba(255,255,255,.45)"
+                    >
+                      0${i+1}<br>
+                      ${f("projects",i,"year")}
+                    </div>
+
+                    <div>
+
+                      <h3
+                        style="
+                          font-size:clamp(2.2rem,3.5vw,3rem);
+                          letter-spacing:-.03em
+                        "
+                      >
+                        ${f("projects",i,"title")}
+                      </h3>
+
+                      <p
+                        style="
+                          margin-top:12px;
+                          max-width:448px;
+                          font-size:14px;
+                          color:rgba(255,255,255,.55)
+                        "
+                      >
+                        ${f("projects",i,"summary")}
+                      </p>
+
+                      <span
+                        class="mono"
+                        style="
+                          display:block;
+                          margin-top:24px;
+                          color:rgba(255,255,255,.7)
+                        "
+                      >
+                        ${e("view_project")} ↗
+                      </span>
+
+                    </div>
+
+                  </a>
+                `
+              ).join("")}
+
+            </div>
+
+
+            <div style="margin-top:32px">
+              ${al("projects","cta_all")}
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <section
+          class="w g"
+          style="
+            --c:1fr 1fr;
+            padding-top:112px;
+            padding-bottom:112px
+          "
+        >
+
+          <div>
+
+            ${lab("04","take_lbl")}
+
+            <h2
+              class="big"
+              style="
+                font-size:clamp(3rem,5.5vw,4.5rem);
+                max-width:672px
+              "
+            >
+              ${e("take_h")}
+            </h2>
+
+          </div>
+
+
+          <div
+            style="
+              display:flex;
+              flex-direction:column;
+              justify-content:flex-end
+            "
+          >
+
+            <p
+              class="m"
+              style="
+                max-width:448px;
+                line-height:1.75
+              "
+            >
+              ${e("take_p")}
+            </p>
+
+            <div style="margin-top:32px">
+              ${al("contact","cta_start")}
+            </div>
+
+          </div>
+
+        </section>
+
+      </main>
+    `;
+  },
+
+
+  about:() => `
+    <main>
+
+      <section
+        class="w"
+        style="
+          padding-top:128px;
+          padding-bottom:112px
+        "
+      >
+
+        ${lab("01","about_lbl")}
+
+        <h1
+          class="hh"
+          style="
+            font-size:clamp(4rem,9vw,9.6rem);
+            max-width:1024px
+          "
+        >
+          ${e("about_a")}<br>
+          <span class="dim">${e("about_b")}</span>
+        </h1>
+
+        <p
+          class="m"
+          style="
+            margin:48px 0 0 25%;
+            max-width:576px;
+            font-size:18px;
+            line-height:1.8
+          "
+        >
+          ${e("missionBody")}
+        </p>
+
+      </section>
+
+
+      <section class="band">
+
+        <div
+          class="w g"
+          style="
+            --c:1fr 1fr;
+            padding-top:96px;
+            padding-bottom:96px
+          "
+        >
+
+          <div>
+
+            ${lab("02","why_lbl")}
+
+            <h2
+              class="big"
+              style="
+                font-size:clamp(3rem,5.5vw,4.5rem);
+                max-width:448px
+              "
+            >
+              ${e("why_h")}
+            </h2>
+
+          </div>
+
+          <div
+            class="s"
+            style="
+              max-width:448px;const fix=v=>v.replace(/^(assets\/lokhit-(?!logo)[\w-]+)\.png$/,"$1.jpg");
 const itag=(v,alt)=>{if(!v)return"";if(v.startsWith("fb:")){const id=v.slice(3),d=IM[id];return `<img class="gs lz${d?" ld":""}" data-fb="${id}" ${d?`src="${d}"`:""} alt="${esc(alt)}" decoding="async">`}return `<img class="gs lz" src="${esc(fix(v))}" alt="${esc(alt)}" decoding="async" onload="this.classList.add('ld')" onerror="this.classList.add('ld')">`};
 function fbLoad(id){return IM[id]?Promise.resolve(IM[id]):IMP[id]||(IMP[id]=(async()=>{const r=doc(db,"images",id);let s;try{s=await getDocFromCache(r)}catch(x){s=await getDoc(r)}return IM[id]=s.data()?.data||""})())}
 function hydrate(){if(!live)return;document.querySelectorAll("img[data-fb]").forEach(img=>fbLoad(img.dataset.fb).then(d=>{if(d&&!img.src){img.onload=()=>img.classList.add("ld");img.src=d}}).catch(()=>{}))}
@@ -341,3 +1304,831 @@ if(live){const app=initializeApp(C);db=getFirestore(app);auth=getAuth(app);ref=d
  onSnapshot(ref,s=>{S={t:{...D},...JSON.parse(JSON.stringify(L))};if(s.exists())merge(s.data());if(!busy())render()},()=>render());
  onAuthStateChanged(auth,u=>{const ad=isAdmin(u);EDIT=ad;if(ad)bar();else document.getElementById("bar").style.display="none";watchMsgs(ad);render()})}
 render();
+
+      const l =
+        el.dataset.l;
+
+      const i =
+        +el.dataset.i;
+
+      const f =
+        el.dataset.f;
+
+
+      if(
+        S[l]?.[i]?.[f] === v
+      )
+        return;
+
+
+      S[l][i][f] =
+        v;
+
+
+      save({
+        [l]:S[l]
+      });
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   IMAGE UPLOAD
+   ========================================================= */
+
+document.addEventListener(
+  "click",
+  async ev => {
+
+    const el =
+      ev.target.closest(
+        "[data-im]"
+      );
+
+    if(
+      !EDIT ||
+      !el
+    )
+      return;
+
+
+    const key =
+      el.dataset.im;
+
+
+    const input =
+      document.createElement(
+        "input"
+      );
+
+    input.type =
+      "file";
+
+    input.accept =
+      "image/*";
+
+
+    input.onchange =
+      async () => {
+
+        const file =
+          input.files?.[0];
+
+        if(!file)
+          return;
+
+
+        if(
+          !storage ||
+          !auth?.currentUser
+        ){
+
+          alert(
+            "Firebase Storage is not available."
+          );
+
+          return;
+
+        }
+
+
+        st(
+          "Uploading…"
+        );
+
+
+        try{
+
+          const path =
+            "uploads/" +
+            Date.now() +
+            "-" +
+            file.name
+              .replace(
+                /[^a-zA-Z0-9._-]/g,
+                "-"
+              );
+
+
+          const r =
+            storageRef(
+              storage,
+              path
+            );
+
+
+          await uploadBytes(
+            r,
+            file
+          );
+
+
+          const url =
+            await getDownloadURL(
+              r
+            );
+
+
+          const p =
+            key.split(":");
+
+
+          if(
+            p[0] === "t"
+          ){
+
+            S.t[p[1]] =
+              url;
+
+
+            await save({
+              t:{
+                [p[1]]:url
+              }
+            });
+
+          }
+
+          else if(
+            p[0] === "l"
+          ){
+
+            const l =
+              p[1];
+
+            const i =
+              +p[2];
+
+            const f =
+              p[3];
+
+
+            if(
+              f ===
+              "imagePaths"
+            ){
+
+              S[l][i][f] =
+                S[l][i][f] ||
+                [];
+
+              S[l][i][f][0] =
+                url;
+
+            }
+
+            else{
+
+              S[l][i][f] =
+                url;
+
+            }
+
+
+            await save({
+              [l]:S[l]
+            });
+
+          }
+
+
+          st(
+            "Image saved ✓"
+          );
+
+
+          render();
+
+        }
+
+        catch(x){
+
+          console.error(x);
+
+          st(
+            "Upload failed"
+          );
+
+          alert(
+            x.message ||
+            "Upload failed."
+          );
+
+        }
+
+      };
+
+
+    input.click();
+
+  }
+);
+
+
+/* =========================================================
+   ARRAY CONTROLS
+   ========================================================= */
+
+document.addEventListener(
+  "click",
+  async ev => {
+
+    const b =
+      ev.target.closest(
+        "[data-a]"
+      );
+
+    if(
+      !EDIT ||
+      !b
+    )
+      return;
+
+
+    const a =
+      b.dataset.a;
+
+    const l =
+      b.dataset.l;
+
+    const i =
+      +b.dataset.i;
+
+
+    if(
+      a === "up" ||
+      a === "dn"
+    ){
+
+      const arr =
+        S[l];
+
+      const ni =
+        a === "up"
+          ? i - 1
+          : i + 1;
+
+
+      if(
+        ni < 0 ||
+        ni >= arr.length
+      )
+        return;
+
+
+      [
+        arr[i],
+        arr[ni]
+      ] =
+      [
+        arr[ni],
+        arr[i]
+      ];
+
+
+      await save({
+        [l]:arr
+      });
+
+
+      render();
+
+      return;
+
+    }
+
+
+    if(
+      a === "ft"
+    ){
+
+      S[l][i].featured =
+        !S[l][i].featured;
+
+
+      await save({
+        [l]:S[l]
+      });
+
+
+      render();
+
+      return;
+
+    }
+
+
+    if(
+      a === "del"
+    ){
+
+      if(
+        !confirm(
+          "Delete this item?"
+        )
+      )
+        return;
+
+
+      S[l].splice(
+        i,
+        1
+      );
+
+
+      await save({
+        [l]:S[l]
+      });
+
+
+      render();
+
+      return;
+
+    }
+
+
+    if(
+      a === "add"
+    ){
+
+      const item =
+        JSON.parse(
+          JSON.stringify(
+            NEW[l]
+          )
+        );
+
+
+      S[l].push(
+        item
+      );
+
+
+      await save({
+        [l]:S[l]
+      });
+
+
+      render();
+
+      return;
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   KIT OPEN / CLOSED
+   ========================================================= */
+
+document.addEventListener(
+  "click",
+  ev => {
+
+    const el =
+      ev.target.closest(
+        "[data-kit]"
+      );
+
+    if(!el)
+      return;
+
+
+    const i =
+      +el.dataset.kit;
+
+
+    open[i] =
+      !open[i];
+
+
+    render();
+
+  }
+);
+
+
+/* =========================================================
+   MAIL LINKS
+   ========================================================= */
+
+function updateMail(){
+
+  document
+    .querySelectorAll(
+      "[data-mail]"
+    )
+    .forEach(
+      a => {
+
+        const email =
+          S.t.contactEmail ||
+          D.contactEmail;
+
+
+        a.href =
+          "mailto:" +
+          email;
+
+      }
+    );
+
+}
+
+
+/* =========================================================
+   ADMIN BAR
+   ========================================================= */
+
+function bar(){
+
+  const b =
+    document.getElementById(
+      "bar"
+    );
+
+  if(!b)
+    return;
+
+
+  b.style.display =
+    EDIT
+      ? "flex"
+      : "none";
+
+
+  const pg =
+    document.getElementById(
+      "pgs"
+    );
+
+
+  if(pg){
+
+    pg.value =
+      route() === "home"
+        ? ""
+        : route();
+
+    pg.onchange =
+      () => {
+
+        const v =
+          pg.value;
+
+        location.hash =
+          v
+            ? "#/" + v
+            : "#/";
+
+      };
+
+  }
+
+
+  const tg =
+    document.getElementById(
+      "tg"
+    );
+
+
+  if(tg){
+
+    tg.onclick =
+      () => {
+
+        EDIT =
+          !EDIT;
+
+        render();
+
+        bar();
+
+      };
+
+  }
+
+
+  const so =
+    document.getElementById(
+      "so"
+    );
+
+
+  if(so){
+
+    so.onclick =
+      async () => {
+
+        try{
+
+          await signOut(
+            auth
+          );
+
+        }
+
+        catch(x){
+
+          console.error(x);
+
+        }
+
+
+        EDIT =
+          false;
+
+        bar();
+
+        render();
+
+      };
+
+  }
+
+}
+
+
+/* =========================================================
+   LOGIN
+   ========================================================= */
+
+function login(){
+
+  const form =
+    document.getElementById(
+      "lf"
+    );
+
+  if(!form)
+    return;
+
+
+  form.onsubmit =
+    async ev => {
+
+      ev.preventDefault();
+
+
+      const email =
+        document.getElementById(
+          "em"
+        ).value.trim();
+
+
+      const password =
+        document.getElementById(
+          "pw"
+        ).value;
+
+
+      const err =
+        document.getElementById(
+          "er"
+        );
+
+
+      err.textContent =
+        "";
+
+
+      try{
+
+        await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+
+        document
+          .getElementById(
+            "dlg"
+          )
+          .close();
+
+
+        EDIT =
+          true;
+
+
+        render();
+
+        bar();
+
+      }
+
+      catch(x){
+
+        console.error(x);
+
+        err.textContent =
+          x.message ||
+          "Sign in failed.";
+
+      }
+
+    };
+
+
+  const cx =
+    document.getElementById(
+      "cx"
+    );
+
+
+  if(cx){
+
+    cx.onclick =
+      () =>
+        document
+          .getElementById(
+            "dlg"
+          )
+          .close();
+
+  }
+
+}
+
+
+/* =========================================================
+   FIREBASE
+   ========================================================= */
+
+if(live){
+
+  try{
+
+    const app =
+      initializeApp(C);
+
+
+    db =
+      getFirestore(
+        app
+      );
+
+
+    auth =
+      getAuth(
+        app
+      );
+
+
+    storage =
+      getStorage(
+        app
+      );
+
+
+    ref =
+      doc(
+        db,
+        "site",
+        "content"
+      );
+
+
+    onSnapshot(
+      ref,
+      snap => {
+
+        if(
+          snap.exists()
+        ){
+
+          const d =
+            snap.data();
+
+
+          S = {
+
+            t:{
+              ...D,
+              ...(d.t || {})
+            },
+
+            projects:
+              d.projects ||
+              JSON.parse(
+                JSON.stringify(
+                  L.projects
+                )
+              ),
+
+            kits:
+              d.kits ||
+              JSON.parse(
+                JSON.stringify(
+                  L.kits
+                )
+              ),
+
+            team:
+              d.team ||
+              JSON.parse(
+                JSON.stringify(
+                  L.team
+                )
+              )
+
+          };
+
+        }
+
+
+        render();
+
+        updateMail();
+
+        if(EDIT)
+          bar();
+
+      },
+
+      err => {
+
+        console.error(
+          "Firestore:",
+          err
+        );
+
+
+        render();
+
+      }
+
+    );
+
+
+    onAuthStateChanged(
+      auth,
+      user => {
+
+        CURRENT_USER =
+          user;
+
+
+        if(
+          user &&
+          ADMIN_EMAIL &&
+          user.email ===
+          ADMIN_EMAIL
+        ){
+
+          EDIT =
+            true;
+
+        }
+
+        else if(!user){
+
+          EDIT =
+            false;
+
+        }
+
+
+        render();
+
+
+        if(EDIT)
+          bar();
+
+      }
+    );
+
+  }
+
+  catch(x){
+
+    console.error(
+      "Firebase init:",
+      x
+    );
+
+
+    render();
+
+  }
+
+}
+
+else{
+
+  render();
+
+}
+
+
+login();
+
+updateMail();
+
